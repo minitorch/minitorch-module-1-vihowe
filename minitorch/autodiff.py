@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Iterable, List, Tuple
+from typing import Any, Iterable, Tuple
 
 from typing_extensions import Protocol
 
@@ -22,8 +22,13 @@ def central_difference(f: Any, *vals: Any, arg: int = 0, epsilon: float = 1e-6) 
     Returns:
         An approximation of $f'_i(x_0, \ldots, x_{n-1})$
     """
-    # TODO: Implement for Task 1.1.
-    raise NotImplementedError("Need to implement for Task 1.1")
+    vals0 = list(vals)
+    vals0[arg] += epsilon
+
+    vals1 = list(vals)
+    vals1[arg] -= epsilon
+
+    return (f(*vals0) - f(*vals1)) / (2 * epsilon)
 
 
 variable_count = 1
@@ -52,17 +57,22 @@ class Variable(Protocol):
 
 
 def topological_sort(variable: Variable) -> Iterable[Variable]:
-    """
-    Computes the topological order of the computation graph.
+    Visited = []
+    result = []
 
-    Args:
-        variable: The right-most variable
+    def visit(n: Variable):
+        if n.is_constant():
+            return
+        if n.unique_id in Visited:
+            return
+        if not n.is_leaf():
+            for input in n.history.inputs:
+                visit(input)
+        Visited.append(n.unique_id)
+        result.insert(0, n)
 
-    Returns:
-        Non-constant Variables in topological order starting from the right.
-    """
-    # TODO: Implement for Task 1.4.
-    raise NotImplementedError("Need to implement for Task 1.4")
+    visit(variable)
+    return result
 
 
 def backpropagate(variable: Variable, deriv: Any) -> None:
@@ -76,8 +86,22 @@ def backpropagate(variable: Variable, deriv: Any) -> None:
 
     No return. Should write to its results to the derivative values of each leaf through `accumulate_derivative`.
     """
-    # TODO: Implement for Task 1.4.
-    raise NotImplementedError("Need to implement for Task 1.4")
+    nodes = topological_sort(variable)
+    node2deriv = {variable.unique_id: deriv}
+    for node in nodes:
+        if node.is_leaf():
+            continue
+        if node.unique_id in node2deriv.keys():
+            deriv = node2deriv[node.unique_id]
+        deriv_tmp = node.chain_rule(deriv)
+        for key, d in deriv_tmp:
+            if key.is_leaf():
+                key.accumulate_derivative(d)
+                continue
+            if key.unique_id in node2deriv.keys():
+                node2deriv[key.unique_id] += d
+            else:
+                node2deriv[key.unique_id] = d
 
 
 @dataclass
